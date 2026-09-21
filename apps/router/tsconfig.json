@@ -4,6 +4,8 @@
     "outDir": "dist",
     "rootDir": "src",
     "lib": ["ES2022"],
+    "declaration": false,
+    "declarationMap": false,
     "types": ["node"]
   },
   "include": ["src"]

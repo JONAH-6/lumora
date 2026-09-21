@@ -24,8 +24,8 @@ const registerSchema = z.object({
   method: z.enum(['GET', 'POST']).optional(),
   priceUsdc: z.string().regex(/^\d+(\.\d{1,7})?$/),
   priceXlm: z.string().optional(),
-  inputSchema: z.record(z.unknown()).optional(),
-  outputSchema: z.record(z.unknown()).optional(),
+  inputSchema: z.record(z.string(), z.unknown()).optional(),
+  outputSchema: z.record(z.string(), z.unknown()).optional(),
   tags: z.array(z.string()).optional(),
 });
 

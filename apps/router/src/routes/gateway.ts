@@ -26,7 +26,7 @@ setInterval(() => {
 router.all('/services/:serviceId', async (req: Request, res: Response) => {
   const start = Date.now();
   const { serviceId } = req.params;
-  const service = getService(serviceId!);
+  const service = getService(serviceId as string);
 
   if (!service || !service.enabled) {
     res.status(404).json({ error: 'Service not found' });
