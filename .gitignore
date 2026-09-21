@@ -10,3 +10,4 @@ dist/
 .next/
 *.wasm
 target/
+*.tsbuildinfo
