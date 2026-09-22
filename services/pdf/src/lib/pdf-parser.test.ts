@@ -100,4 +100,51 @@ describe('fetchPdf', () => {
     const result = await fetchPdf('https://example.test/file.pdf');
     expect(new Uint8Array(result)).toEqual(payload);
   });
+
+  it('rejects a redirect whose target resolves to a private address', async () => {
+    // First hop resolves to a public address and returns a redirect;
+    // the redirect target must be independently re-validated, and its
+    // (private) resolution must be rejected before it is ever fetched.
+    lookupMock
+      .mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }])
+      .mockResolvedValueOnce([{ address: '127.0.0.1', family: 4 }]);
+    const fetchSpy = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 302,
+      statusText: 'Found',
+      headers: new Headers({ location: 'https://internal.example.test/secret.pdf' }),
+      body: null,
+      arrayBuffer: async () => new ArrayBuffer(0),
+    } as unknown as Response);
+    vi.stubGlobal('fetch', fetchSpy);
+
+    await expect(fetchPdf('https://example.test/file.pdf')).rejects.toThrow();
+    expect(fetchSpy).toHaveBeenCalledTimes(1); // never followed to the second hop
+  });
+
+  it('follows a redirect to a public address and validates it independently', async () => {
+    lookupMock
+      .mockResolvedValueOnce([{ address: '93.184.216.34', family: 4 }])
+      .mockResolvedValueOnce([{ address: '93.184.216.35', family: 4 }]);
+    const payload = new Uint8Array([0x25, 0x50, 0x44, 0x46]); // "%PDF"
+    const redirectResponse = {
+      ok: false,
+      status: 302,
+      statusText: 'Found',
+      headers: new Headers({ location: 'https://mirror.example.test/file.pdf' }),
+      body: null,
+      arrayBuffer: async () => new ArrayBuffer(0),
+    } as unknown as Response;
+    const fetchSpy = vi
+      .fn()
+      .mockResolvedValueOnce(redirectResponse)
+      .mockResolvedValueOnce(makeResponse({ body: payload }));
+    vi.stubGlobal('fetch', fetchSpy);
+
+    const result = await fetchPdf('https://example.test/file.pdf');
+    expect(new Uint8Array(result)).toEqual(payload);
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy.mock.calls[1]?.[0]).toBeInstanceOf(URL);
+    expect((fetchSpy.mock.calls[1]?.[0] as URL).toString()).toBe('https://mirror.example.test/file.pdf');
+  });
 });
