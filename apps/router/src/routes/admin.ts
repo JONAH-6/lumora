@@ -1,3 +1,4 @@
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { Router } from 'express';
 import { z } from 'zod';
 import { config } from '../config.js';
@@ -6,10 +7,19 @@ import { evictProxyCache } from '../lib/proxy.js';
 
 const router = Router();
 
+// Compares two strings in constant time by hashing both to equal-length
+// digests first. Comparing raw buffers of unequal length directly would
+// leak length information and can throw in timingSafeEqual.
+function timingSafeEqualStrings(a: string, b: string): boolean {
+  const hashA = createHash('sha256').update(a).digest();
+  const hashB = createHash('sha256').update(b).digest();
+  return timingSafeEqual(hashA, hashB);
+}
+
 // Auth middleware for admin routes
 router.use((req, res, next) => {
   const apiKey = req.headers['x-admin-key'];
-  if (apiKey !== config.ADMIN_API_KEY) {
+  if (typeof apiKey !== 'string' || !timingSafeEqualStrings(apiKey, config.ADMIN_API_KEY)) {
     res.status(401).json({ error: 'Unauthorized' });
     return;
   }
