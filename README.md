@@ -127,12 +127,12 @@ pnpm dev
 
 | Variable | Required | Description |
 |---|---|---|
-| `ROUTER_WALLET_PUBLIC` | Yes | Router hot wallet public key (receives payments) |
-| `ROUTER_WALLET_SECRET` | Yes | Router hot wallet secret key |
-| `ADMIN_API_KEY` | Yes | Key for `X-Admin-Key` header on admin routes |
+| `ROUTER_WALLET_PUBLIC` | Yes | Router hot wallet public key (receives payments). Must be a valid Stellar Ed25519 public key ("G...") |
+| `ROUTER_WALLET_SECRET` | Yes | Router hot wallet secret key. Must be a valid Stellar secret seed ("S...") that derives `ROUTER_WALLET_PUBLIC` |
+| `ADMIN_API_KEY` | Yes | Key for `X-Admin-Key` header on admin routes. On `STELLAR_NETWORK=mainnet`, must not be the default `change-me` and must be at least 24 characters |
 | `STELLAR_NETWORK` | No | `testnet` (default) or `mainnet` |
 | `STELLAR_HORIZON_URL` | No | Default: Horizon testnet |
-| `USDC_ISSUER` | No | Default: testnet USDC issuer |
+| `USDC_ISSUER` | No | Default: testnet USDC issuer. Must be a valid Stellar Ed25519 public key ("G...") |
 | `PAYMENT_EXPIRY_SECONDS` | No | Default: 300 |
 | `DATABASE_PATH` | No | Default: `./lumora.db` |
 | `AGENT_WALLET_SECRET` | MCP only | Agent's Stellar secret key |
