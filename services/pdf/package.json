@@ -11,6 +11,7 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
+    "@lumora/net-guard": "workspace:*",
     "fastify": "^5.3.3",
     "pdfjs-dist": "^4.10.38",
     "pino": "^9.6.0",
