@@ -309,8 +309,22 @@ From the repo root:
 
 - [PRD](docs/PRD.md) — Full product requirements, x402 flow, anti-replay design
 - [Architecture](docs/ARCHITECTURE.md) — Component map, DB schema, key file reference
+- [Contributing](CONTRIBUTING.md) — Dev setup, conventions, PR checklist
+- [Security Policy](SECURITY.md) — How to report vulnerabilities, threat model and known gaps
+- [Code of Conduct](CODE_OF_CONDUCT.md)
 - [x402 Protocol Spec](https://x402.org)
 - [Stellar Horizon API](https://developers.stellar.org/docs/data/horizon)
 - [Soroban SDK](https://developers.stellar.org/docs/tools/developer-tools/soroban-sdk)
 - [MCP SDK](https://github.com/modelcontextprotocol/sdk)
 
+---
+
+## Contributing
+
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first and follow the [Code of Conduct](CODE_OF_CONDUCT.md). Report security issues privately as described in [SECURITY.md](SECURITY.md).
+
+---
+
+## License
+
+Lumora is released under the [MIT License](LICENSE).
