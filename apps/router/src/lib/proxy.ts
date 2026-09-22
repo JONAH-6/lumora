@@ -1,4 +1,5 @@
-import { createProxyMiddleware, type RequestHandler } from 'http-proxy-middleware';
+import { createProxyMiddleware, fixRequestBody, type RequestHandler } from 'http-proxy-middleware';
+import type { ClientRequest, IncomingMessage } from 'node:http';
 import type { Service } from '@lumora/types';
 import { logger } from './logger.js';
 import { config } from '../config.js';
@@ -31,10 +32,12 @@ export function getServiceProxy(service: Service): RequestHandler {
     changeOrigin: true,
     pathRewrite: () => pathSuffix,
     on: {
-      proxyReq: (proxyReq: { setHeader: (name: string, value: string) => void }) => {
-        if (isInternalTarget && config.PDF_INTERNAL_KEY) {
-          proxyReq.setHeader('x-internal-key', config.PDF_INTERNAL_KEY);
-        }
+      // express.json() has already consumed and parsed the request stream by
+      // the time this middleware runs, so the raw body must be re-serialized
+      // onto the proxied request — otherwise a paid POST reaches upstream
+      // with an empty (or hanging) body.
+      proxyReq: (proxyReq: ClientRequest, req: IncomingMessage) => {
+        fixRequestBody(proxyReq, req);
       },
       error: (err: unknown, _req: unknown, _res: unknown, next: unknown) => {
         logger.error({ err, serviceId: service.id }, 'Proxy upstream error');

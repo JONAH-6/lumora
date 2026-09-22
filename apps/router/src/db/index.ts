@@ -41,10 +41,21 @@ CREATE TABLE IF NOT EXISTS request_log (
   created_at   INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS challenges (
+  request_id   TEXT    PRIMARY KEY,
+  service_id   TEXT    NOT NULL,
+  amount       TEXT    NOT NULL,
+  expires_at   INTEGER NOT NULL,
+  consumed     INTEGER NOT NULL DEFAULT 0,
+  created_at   INTEGER NOT NULL,
+  FOREIGN KEY (service_id) REFERENCES services(id)
+);
+
 CREATE INDEX IF NOT EXISTS idx_payments_request_id  ON payments(request_id);
 CREATE INDEX IF NOT EXISTS idx_payments_created_at  ON payments(created_at);
 CREATE INDEX IF NOT EXISTS idx_request_log_service  ON request_log(service_id);
 CREATE INDEX IF NOT EXISTS idx_request_log_created  ON request_log(created_at);
+CREATE INDEX IF NOT EXISTS idx_challenges_expires_at ON challenges(expires_at);
 `;
 
 let _db: Database.Database | null = null;
