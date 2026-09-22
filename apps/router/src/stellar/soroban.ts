@@ -14,8 +14,8 @@ export async function notifySpend(
 
   try {
     // Dynamic import to avoid loading Soroban SDK when not needed
-    const { SorobanRpc, Contract, nativeToScVal, Address } = await import('@stellar/stellar-sdk');
-    const server = new SorobanRpc.Server(config.STELLAR_RPC_URL);
+    const { rpc, Contract, nativeToScVal, Address } = await import('@stellar/stellar-sdk');
+    const server = new rpc.Server(config.STELLAR_RPC_URL);
 
     const contract = new Contract(config.SPENDING_POLICY_CONTRACT_ID);
     logger.debug({ agentAddress, amountRaw, serviceId }, 'Soroban spending policy notified (stub)');
