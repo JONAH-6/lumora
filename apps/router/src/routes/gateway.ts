@@ -33,6 +33,11 @@ router.all('/services/:serviceId', async (req: Request, res: Response) => {
     return;
   }
 
+  if (req.method !== service.method) {
+    res.status(405).json({ error: `Method ${req.method} not allowed for this service. Use ${service.method}.` });
+    return;
+  }
+
   const xPayment = req.headers['x-payment'] as string | undefined;
 
   // ── No payment header: issue 402 challenge ──────────────────────────────────
