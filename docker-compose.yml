@@ -17,6 +17,7 @@ services:
       ROUTER_WALLET_PUBLIC: ${ROUTER_WALLET_PUBLIC}
       ROUTER_WALLET_SECRET: ${ROUTER_WALLET_SECRET}
       ADMIN_API_KEY: ${ADMIN_API_KEY:-change-me}
+      PDF_INTERNAL_KEY: ${PDF_INTERNAL_KEY:-change-me}
       PAYMENT_EXPIRY_SECONDS: ${PAYMENT_EXPIRY_SECONDS:-300}
       PDF_SERVICE_URL: http://pdf:3002/extract-text
       PDF_SERVICE_URL_JSON: http://pdf:3002/to-json
@@ -35,11 +36,12 @@ services:
     build:
       context: .
       dockerfile: services/pdf/Dockerfile
-    ports:
-      - "3002:3002"
+    expose:
+      - "3002"
     environment:
       NODE_ENV: production
       PDF_SERVICE_PORT: "3002"
+      PDF_INTERNAL_KEY: ${PDF_INTERNAL_KEY:-change-me}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3002/health"]
