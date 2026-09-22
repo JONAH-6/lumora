@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from 'express';
 import { getService } from '../db/queries/services.js';
 import { recordPayment } from '../db/queries/payments.js';
 import { insertLog } from '../db/queries/logs.js';
+import { insertChallenge, getChallenge, consumeChallenge, deleteExpiredChallenges } from '../db/queries/challenges.js';
 import { buildChallenge } from '../x402/challenge.js';
 import { verifyPaymentHeader } from '../x402/verify.js';
 import { getServiceProxy } from '../lib/proxy.js';
@@ -11,16 +12,13 @@ import { logger } from '../lib/logger.js';
 
 const router = Router();
 
-// Pending requests: requestId → { serviceId, expiresAt }
-// Issued on 402; consumed on successful payment verification.
-const pendingRequests = new Map<string, { serviceId: string; expiresAt: number }>();
+// Pending x402 challenges are persisted in the `challenges` table (see
+// db/queries/challenges.ts) so they survive restarts and are shared across
+// router instances. Issued on 402; consumed atomically on payment.
 
-// Evict expired pending requests every minute
+// Evict expired challenges every minute
 setInterval(() => {
-  const now = Date.now();
-  for (const [id, val] of pendingRequests) {
-    if (now > val.expiresAt) pendingRequests.delete(id);
-  }
+  deleteExpiredChallenges(Date.now());
 }, 60_000).unref(); // .unref() so this timer doesn't prevent process exit
 
 router.all('/services/:serviceId', async (req: Request, res: Response) => {
@@ -46,8 +44,10 @@ router.all('/services/:serviceId', async (req: Request, res: Response) => {
     const challenge = buildChallenge(service, resourceUrl);
     const expiryMs = config.PAYMENT_EXPIRY_SECONDS * 1000;
 
-    pendingRequests.set(challenge.requestId, {
+    insertChallenge({
+      requestId: challenge.requestId,
       serviceId: service.id,
+      amount: challenge.accepts[0]!.maxAmountRequired,
       expiresAt: Date.now() + expiryMs,
     });
 
@@ -68,7 +68,7 @@ router.all('/services/:serviceId', async (req: Request, res: Response) => {
   // ── Validate that this requestId was issued by us ───────────────────────────
   // This prevents an attacker from submitting an arbitrary payment without first
   // receiving a 402 challenge from this router instance.
-  const pending = pendingRequests.get(requestId);
+  const pending = getChallenge(requestId);
   if (!pending) {
     res.status(400).json({ error: 'Unknown or expired request ID. Make an unpaid request first to receive a 402 challenge.' });
     return;
@@ -79,8 +79,12 @@ router.all('/services/:serviceId', async (req: Request, res: Response) => {
     return;
   }
 
+  if (pending.consumed) {
+    res.status(400).json({ error: 'Request ID already used' });
+    return;
+  }
+
   if (Date.now() > pending.expiresAt) {
-    pendingRequests.delete(requestId);
     res.status(402).json({ error: 'Request ID expired. Please retry to get a fresh 402 challenge.' });
     return;
   }
@@ -92,6 +96,16 @@ router.all('/services/:serviceId', async (req: Request, res: Response) => {
     logger.warn({ serviceId, requestId, error: result.error }, 'Payment verification failed');
     insertLog({ serviceId: service.id, status: 'error', durationMs: Date.now() - start });
     res.status(402).json({ error: result.error });
+    return;
+  }
+
+  // ── Atomically consume the challenge ─────────────────────────────────────
+  // A single UPDATE guarded by `consumed = 0 AND expires_at > ?` closes the
+  // window where two concurrent requests carrying the same requestId could
+  // both pass verification: only one of them can flip consumed to 1.
+  const consumed = consumeChallenge(requestId, Date.now());
+  if (!consumed) {
+    res.status(402).json({ error: 'Request ID already used or expired' });
     return;
   }
 
@@ -116,9 +130,6 @@ router.all('/services/:serviceId', async (req: Request, res: Response) => {
     }
     throw err;
   }
-
-  // Consume the pending request
-  pendingRequests.delete(requestId);
 
   logger.info(
     { serviceId, txHash: result.proof!.payload.txHash, from: result.fromAddress },
