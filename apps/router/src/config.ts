@@ -10,6 +10,7 @@ const schema = z.object({
   STELLAR_RPC_URL: z.string().url(),
   USDC_ISSUER: z.string().min(1),
   ADMIN_API_KEY: z.string().min(1),
+  PDF_INTERNAL_KEY: z.string().optional(),
   SPENDING_POLICY_CONTRACT_ID: z.string().optional(),
   PAYMENT_EXPIRY_SECONDS: z.coerce.number().default(300),
 });

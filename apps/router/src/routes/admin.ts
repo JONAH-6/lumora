@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { assertSafeUrl, UnsafeUrlError } from '@lumora/net-guard';
 import { config } from '../config.js';
 import { insertService, deleteService, listServices } from '../db/queries/services.js';
 import { evictProxyCache } from '../lib/proxy.js';
+
+const isDevelopment = process.env['NODE_ENV'] === 'development';
 
 const router = Router();
 
@@ -29,12 +32,23 @@ const registerSchema = z.object({
   tags: z.array(z.string()).optional(),
 });
 
-router.post('/admin/services', (req, res) => {
+router.post('/admin/services', async (req, res) => {
   const parsed = registerSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: 'Invalid input', details: parsed.error.flatten() });
     return;
   }
+
+  try {
+    await assertSafeUrl(parsed.data.upstreamUrl, {
+      allowedSchemes: isDevelopment ? ['http:', 'https:'] : ['https:'],
+    });
+  } catch (err: unknown) {
+    const message = err instanceof UnsafeUrlError ? err.message : 'Invalid upstreamUrl';
+    res.status(400).json({ error: message });
+    return;
+  }
+
   try {
     const service = insertService(parsed.data);
     res.status(201).json({ service });

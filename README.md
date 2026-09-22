@@ -130,6 +130,7 @@ pnpm dev
 | `ROUTER_WALLET_PUBLIC` | Yes | Router hot wallet public key (receives payments) |
 | `ROUTER_WALLET_SECRET` | Yes | Router hot wallet secret key |
 | `ADMIN_API_KEY` | Yes | Key for `X-Admin-Key` header on admin routes |
+| `PDF_INTERNAL_KEY` | Yes (non-dev) | Shared secret sent as `x-internal-key` when the router proxies to the PDF service; the PDF service refuses to start without it outside development |
 | `STELLAR_NETWORK` | No | `testnet` (default) or `mainnet` |
 | `STELLAR_HORIZON_URL` | No | Default: Horizon testnet |
 | `USDC_ISSUER` | No | Default: testnet USDC issuer |
