@@ -1,9 +1,8 @@
 import type { X402PaymentProof } from './types.js';
-import { fetchAndVerifyPayment } from '../stellar/horizon.js';
+import { fetchAndVerifyPayment, type PaymentVerificationFailureReason } from '../stellar/horizon.js';
 import { isPaymentUsed } from '../db/queries/payments.js';
 import { config } from '../config.js';
 import { usdcToStroops } from '../stellar/utils.js';
-import { logger } from '../lib/logger.js';
 
 export interface VerifyResult {
   ok: boolean;
@@ -38,41 +37,28 @@ export async function verifyPaymentHeader(
     return { ok: false, error: 'Payment already used' };
   }
 
-  // 3. Fetch and verify transaction from Horizon
-  const payment = await fetchAndVerifyPayment(txHash);
-  if (!payment) {
-    return { ok: false, error: 'Transaction not found on network' };
+  // 3. Fetch and verify transaction from Horizon: successful flag, memo type/value,
+  //    and a matching `payment` operation (destination, asset, amount) in one pass.
+  const requiredStroops = usdcToStroops(priceUsdc);
+  const result = await fetchAndVerifyPayment(txHash, expectedRequestId, {
+    destination: config.ROUTER_WALLET_PUBLIC,
+    assetCode: 'USDC',
+    assetIssuer: config.USDC_ISSUER,
+    minAmountStroops: requiredStroops,
+  });
+
+  if (!result.ok) {
+    return { ok: false, error: describeVerificationFailure(result.reason) };
   }
 
-  // 4. Verify destination is router wallet
-  if (payment.to !== config.ROUTER_WALLET_PUBLIC) {
-    return { ok: false, error: 'Payment destination mismatch' };
-  }
+  const { payment } = result;
 
-  // 5. Verify sender matches claim
+  // 4. Verify sender matches claim
   if (payment.from !== from) {
     return { ok: false, error: 'Payment sender mismatch' };
   }
 
-  // 6. Verify memo matches requestId (nonce)
-  if (payment.memo !== expectedRequestId) {
-    logger.warn({ memo: payment.memo, expectedRequestId }, 'Memo mismatch');
-    return { ok: false, error: 'Payment memo does not match request ID' };
-  }
-
-  // 7. Verify amount is sufficient using string-based conversion (no float precision loss)
-  const requiredStroops = usdcToStroops(priceUsdc);
-  const paidStroops = usdcToStroops(payment.amount); // Horizon returns decimal e.g. "0.0500000"
-  if (paidStroops < requiredStroops) {
-    return { ok: false, error: `Insufficient payment: paid ${paidStroops}, required ${requiredStroops}` };
-  }
-
-  // 8. Verify asset is USDC with correct issuer
-  if (payment.asset !== 'USDC' || payment.issuer !== config.USDC_ISSUER) {
-    return { ok: false, error: 'Invalid payment asset' };
-  }
-
-  // 9. Verify transaction is not too old (anti-replay time window)
+  // 5. Verify transaction is not too old (anti-replay time window)
   const ageMs = Date.now() - payment.createdAt.getTime();
   const maxAgeMs = config.PAYMENT_EXPIRY_SECONDS * 1000;
   if (ageMs > maxAgeMs) {
@@ -80,4 +66,19 @@ export async function verifyPaymentHeader(
   }
 
   return { ok: true, proof, fromAddress: from };
+}
+
+function describeVerificationFailure(reason: PaymentVerificationFailureReason): string {
+  switch (reason) {
+    case 'transaction_fetch_failed':
+      return 'Transaction not found on network';
+    case 'transaction_unsuccessful':
+      return 'Transaction was not successful on the network';
+    case 'invalid_memo_type':
+      return 'Payment memo must be of type text';
+    case 'memo_mismatch':
+      return 'Payment memo does not match request ID';
+    case 'no_matching_payment_operation':
+      return 'No matching payment operation found for destination, asset and amount';
+  }
 }
