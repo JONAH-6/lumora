@@ -1,18 +1,36 @@
 import { StrKey } from '@stellar/stellar-sdk';
 
 /**
+ * Raised when a USDC amount string is not well-formed. Distinct from a
+ * generic Error so the error middleware can map it to a 4xx response
+ * instead of the default 500.
+ */
+export class InvalidAmountError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidAmountError';
+  }
+}
+
+// Non-negative decimal amount with at most 7 fractional digits (USDC precision).
+// No leading/trailing whitespace, no exponents, no sign.
+const USDC_AMOUNT_PATTERN = /^\d+(\.\d{1,7})?$/;
+
+/**
  * Convert a USDC decimal string (e.g. "0.0500000") to stroops (bigint).
  * Uses string arithmetic to avoid floating-point precision loss.
  */
 export function usdcToStroops(usdc: string): bigint {
-  if (!usdc || usdc.trim() === '') throw new Error('Empty amount string');
+  if (!usdc || usdc.trim() === '') {
+    throw new InvalidAmountError('Empty amount string');
+  }
   const trimmed = usdc.trim();
-  const negative = trimmed.startsWith('-');
-  const abs = negative ? trimmed.slice(1) : trimmed;
-  const [whole = '0', decimals = ''] = abs.split('.');
-  const paddedDecimals = decimals.padEnd(7, '0').slice(0, 7);
-  const result = BigInt(whole) * 10_000_000n + BigInt(paddedDecimals);
-  return negative ? -result : result;
+  if (!USDC_AMOUNT_PATTERN.test(trimmed)) {
+    throw new InvalidAmountError(`Malformed USDC amount: ${usdc}`);
+  }
+  const [whole, decimals = ''] = trimmed.split('.');
+  const paddedDecimals = decimals.padEnd(7, '0');
+  return BigInt(whole) * 10_000_000n + BigInt(paddedDecimals);
 }
 
 /**
